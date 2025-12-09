@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Samayan AI Lab</title>
+    <title>Samayan Ad AI Lab</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -16,23 +16,52 @@
                 600: '#0284c7',
                 900: '#0c4a6e',
               },
-              slate: {
-                800: '#1e293b',
-                900: '#0f172a',
+              navy: {
+                DEFAULT: '#0A1F44', // Requested Navy Blue
+                light: '#142a55',
+              },
+              softblack: {
+                DEFAULT: '#111111', // Requested Soft Black
+              },
+              lightgrey: {
+                DEFAULT: '#E5E5E5', // Requested Light Grey
+                50: '#F9FAFB',
+              }
+            },
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+            },
+            animation: {
+              'float-up': 'floatUp 4s ease-in infinite',
+              'fall-down': 'fallDown 3s linear infinite',
+              'bounce-slow': 'bounce 3s infinite',
+            },
+            keyframes: {
+              floatUp: {
+                '0%': { transform: 'translateY(100vh) rotate(0deg)', opacity: '1' },
+                '100%': { transform: 'translateY(-100px) rotate(20deg)', opacity: '0' },
+              },
+              fallDown: {
+                '0%': { transform: 'translateY(-100px) rotate(0deg)', opacity: '1' },
+                '100%': { transform: 'translateY(100vh) rotate(360deg)', opacity: '0' },
               }
             }
           }
         }
       }
     </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
+      body {
+        font-family: 'Inter', sans-serif;
+      }
       /* Custom Scrollbar for sleek look */
       ::-webkit-scrollbar {
         width: 8px;
         height: 8px;
       }
       ::-webkit-scrollbar-track {
-        background: #f1f5f9; 
+        background: #F9FAFB; 
       }
       ::-webkit-scrollbar-thumb {
         background: #cbd5e1; 
@@ -61,7 +90,7 @@
 }
 </script>
 </head>
-  <body class="bg-slate-50 text-slate-900 antialiased overflow-hidden">
+  <body class="bg-lightgrey-50 text-softblack antialiased">
     <div id="root"></div>
   </body>
 </html>

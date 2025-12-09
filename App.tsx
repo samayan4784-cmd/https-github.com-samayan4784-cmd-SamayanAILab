@@ -1,8 +1,10 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Palette, Monitor, Mic, Video, Image as ImageIcon, 
-  Layout, FolderOpen, Menu, X, User, LogOut, Code, Play, Square, MessageSquare, Keyboard,
-  Trash2, Download, Eye, Maximize2
+  Layout, FolderOpen, Menu, X, User, Code, Square, 
+  Trash2, Download, Maximize2, Sparkles, Box, Music, 
+  ArrowRight, Phone, Star, Shield, Mail, CheckCircle, Lock, Send
 } from 'lucide-react';
 import { ToolType, Project } from './types';
 import { generateCreativeContent, generateVoiceChat } from './services/geminiService';
@@ -13,707 +15,754 @@ import { Button, InputArea } from './components/Shared';
 const SidebarItem = ({ active, icon: Icon, label, onClick }: any) => (
   <button 
     onClick={onClick}
-    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-      active ? 'bg-sky-500 text-white shadow-lg shadow-sky-500/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+    className={`w-full flex items-center gap-3 px-4 py-3 mx-auto rounded-xl transition-all duration-200 group ${
+      active 
+        ? 'bg-sky-500 text-white font-semibold shadow-md shadow-sky-900/20 translate-x-1' 
+        : 'text-gray-300 hover:bg-white/10 hover:text-white hover:translate-x-1'
     }`}
   >
-    <Icon className="w-5 h-5" />
-    <span className="font-medium">{label}</span>
+    <Icon className={`w-5 h-5 transition-colors ${active ? 'text-white' : 'text-sky-400 group-hover:text-sky-300'}`} />
+    <span className="truncate text-sm tracking-wide">{label}</span>
   </button>
 );
 
-const FeatureHeader = ({ title, subtitle }: { title: string, subtitle: string }) => (
-  <div className="mb-6 fade-in">
-    <h2 className="text-3xl font-bold text-slate-900">{title}</h2>
-    <p className="text-slate-500 mt-1">{subtitle}</p>
+// New Centered Header for Tools
+const ToolCenteredHeader = ({ icon: Icon, title, subtitle }: { icon: any, title: string, subtitle: string }) => (
+  <div className="flex flex-col items-center justify-center text-center mb-10 fade-in pt-6">
+    <div className="w-24 h-24 bg-white rounded-full shadow-lg border-4 border-sky-100 flex items-center justify-center mb-6 transform hover:scale-105 transition-transform duration-300">
+        <Icon className="w-12 h-12 text-sky-600" />
+    </div>
+    <h1 className="text-3xl md:text-5xl font-extrabold text-navy tracking-tight mb-2">Samayan {title}</h1>
+    <p className="text-gray-500 text-lg max-w-lg mx-auto">{subtitle}</p>
+    <div className="w-20 h-1.5 bg-sky-500 rounded-full mt-6"></div>
   </div>
+);
+
+// --- Decoration Components ---
+const Balloons = () => {
+  const colors = ['bg-red-500', 'bg-blue-500', 'bg-yellow-500', 'bg-green-500', 'bg-purple-500', 'bg-pink-500'];
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+      {[...Array(15)].map((_, i) => (
+        <div 
+          key={i}
+          className={`absolute w-12 h-16 rounded-full opacity-80 animate-float-up ${colors[i % colors.length]}`}
+          style={{
+            left: `${Math.random() * 100}%`,
+            animationDelay: `${Math.random() * 2}s`,
+            bottom: '-100px'
+          }}
+        >
+          <div className="absolute bottom-[-10px] left-1/2 w-0.5 h-10 bg-slate-300 -translate-x-1/2" />
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const Confetti = () => {
+    const colors = ['bg-red-400', 'bg-blue-400', 'bg-yellow-400', 'bg-green-400', 'bg-purple-400'];
+    return (
+      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+        {[...Array(30)].map((_, i) => (
+          <div 
+            key={i}
+            className={`absolute w-3 h-3 rounded-sm opacity-90 animate-fall-down ${colors[i % colors.length]}`}
+            style={{
+              left: `${Math.random() * 100}%`,
+              animationDelay: `${Math.random() * 3}s`,
+              top: '-20px'
+            }}
+          />
+        ))}
+      </div>
+    );
+  };
+
+const LandingSection = ({ children, className = "", id }: { children?: React.ReactNode, className?: string, id?: string }) => (
+  <section id={id} className={`py-20 px-6 md:px-12 max-w-7xl mx-auto ${className}`}>
+    {children}
+  </section>
 );
 
 // --- Main App ---
 
 export default function App() {
   const [isOnboarded, setIsOnboarded] = useState(false);
+  const [showSurprise, setShowSurprise] = useState(false);
   const [userName, setUserName] = useState('');
   const [tempName, setTempName] = useState('');
-  const [error, setError] = useState('');
-  const [activeTool, setActiveTool] = useState<ToolType>(ToolType.DASHBOARD);
-  const [isSidebarOpen, setSidebarOpen] = useState(true);
+  const [errorMsg, setErrorMsg] = useState('');
   
-  // Generation State
+  const [activeTool, setActiveTool] = useState<ToolType>(ToolType.DASHBOARD);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isToolLoading, setIsToolLoading] = useState(false);
+  
   const [prompt, setPrompt] = useState('');
-  const [uploadedImage, setUploadedImage] = useState<{data: string, mimeType: string} | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [result, setResult] = useState<{
-    text?: string;
-    imageUrl?: string;
-    videoUrl?: string;
-    audioUrl?: string;
-    code?: string;
-    html?: string;
-  } | null>(null);
-
-  // Voice Studio State
-  const [voiceMode, setVoiceMode] = useState<'TEXT_INPUT' | 'AUDIO_INPUT'>('TEXT_INPUT');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [result, setResult] = useState<any>(null);
+  const [imageBase64, setImageBase64] = useState('');
+  const [imageMimeType, setImageMimeType] = useState('');
+  
+  const [voiceMode, setVoiceMode] = useState<'text' | 'audio'>('audio');
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-
-  // Projects State with Persistence
+  
+  // Projects
   const [projects, setProjects] = useState<Project[]>(() => {
-    try {
+      try {
         const saved = localStorage.getItem('samayan_projects');
         return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-        console.error("Failed to load projects", e);
+      } catch (e) {
         return [];
-    }
+      }
   });
-  
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
-  // Save projects to local storage whenever they change
   useEffect(() => {
-    localStorage.setItem('samayan_projects', JSON.stringify(projects));
+      localStorage.setItem('samayan_projects', JSON.stringify(projects));
   }, [projects]);
 
-  // Onboarding Logic
-  const handleOnboarding = () => {
+  const handleToolSwitch = (tool: ToolType) => {
+    setSidebarOpen(false);
+    if (tool === activeTool) return;
+    
+    setIsToolLoading(true);
+    setTimeout(() => {
+      setActiveTool(tool);
+      setIsToolLoading(false);
+      setPrompt('');
+      setResult(null);
+      setImageBase64('');
+    }, 1500);
+  };
+
+  const handleNameSubmit = () => {
     if (!tempName.trim()) {
-      setError("Please enter your name.");
+      setErrorMsg("Please enter your name to continue ⚠️");
       return;
     }
+    if (/\d/.test(tempName)) {
+      setErrorMsg("Name cannot contain numbers.");
+      return;
+    }
+    if (tempName.length < 3) {
+      setErrorMsg("Name is too short.");
+      return;
+    }
+
     setUserName(tempName);
-    setIsOnboarded(true);
-    setError('');
+    
+    setShowSurprise(true);
+    setTimeout(() => {
+      setShowSurprise(false);
+      setIsOnboarded(true);
+    }, 4000);
   };
 
-  // Save Project Logic
-  const saveProject = useCallback((content: any) => {
-    const newProject: Project = {
-        id: Date.now().toString() + Math.random().toString(36).substr(2, 9), // Robust Unique ID
-        name: `${activeTool === ToolType.ANIMATION_3D ? '3D Render' : activeTool.replace('_', ' ')} - ${new Date().toLocaleTimeString()}`,
-        type: activeTool,
-        content: content.text || content.code || prompt || "Audio Project",
-        mediaUrl: content.imageUrl || content.audioUrl,
-        html: content.html,
-        createdAt: Date.now()
-    };
-    setProjects(prev => [newProject, ...prev]);
-  }, [activeTool, prompt]);
-
-  // Project Actions
-  const handleDeleteProject = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation(); // Prevents opening the modal
-    e.preventDefault();
-    
-    // Immediate delete without confirm to fix "not working" complaints on some devices
-    const updatedProjects = projects.filter(p => p.id !== id);
-    setProjects(updatedProjects);
-    
-    // If the deleted project was open, close the modal
-    if (selectedProject?.id === id) {
-        setSelectedProject(null);
-    }
-  };
-
-  const handleDownloadProject = (e: React.MouseEvent | null, project: Project) => {
-    if (e) {
-        e.stopPropagation();
-        e.preventDefault();
-    }
-    const link = document.createElement('a');
-    
-    if (project.mediaUrl) {
-        // Image or Audio
-        link.href = project.mediaUrl;
-        const ext = project.mediaUrl.startsWith('data:audio') ? 'wav' : 'png';
-        link.download = `samayan-${project.name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.${ext}`;
-    } else if (project.html) {
-        // Website HTML
-        const blob = new Blob([project.html], { type: 'text/html' });
-        link.href = URL.createObjectURL(blob);
-        link.download = `samayan-website-${project.name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.html`;
-    } else {
-        // Text
-        const blob = new Blob([project.content], { type: 'text/plain' });
-        link.href = URL.createObjectURL(blob);
-        link.download = `samayan-text-${project.name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.txt`;
-    }
-    
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  // Unified Generation Handler
   const handleGenerate = async () => {
-    // Validation
-    if (activeTool !== ToolType.VOICE_STUDIO && !prompt && !uploadedImage) {
-        alert("Please enter a prompt or upload an image.");
-        return;
-    }
-    if (activeTool === ToolType.VOICE_STUDIO && voiceMode === 'TEXT_INPUT' && !prompt) {
-        alert("Please enter text to speak.");
-        return;
+    if (!prompt && !imageBase64 && activeTool !== ToolType.IMAGE_LAB) return;
+    
+    let finalPrompt = prompt;
+    if (activeTool === ToolType.IMAGE_LAB && !finalPrompt) {
+        finalPrompt = "Enhance this image and make it look professional.";
     }
 
-    setIsLoading(true);
+    setIsGenerating(true);
     setResult(null);
 
     try {
-        let res: any = {};
+      const res = await generateCreativeContent(activeTool, finalPrompt, imageBase64, imageMimeType);
+      setResult(res);
+      
+      const newProject: Project = {
+        id: crypto.randomUUID(),
+        name: `${activeTool.replace('SAMAYAN_', '').replace('_', ' ')}`,
+        type: activeTool,
+        content: finalPrompt || "Generated Content",
+        createdAt: Date.now(),
+        mediaUrl: res.imageUrl,
+        html: res.html || res.code 
+      };
+      
+      setProjects(prev => {
+          const updated = [newProject, ...prev];
+          localStorage.setItem('samayan_projects', JSON.stringify(updated));
+          return updated;
+      });
 
-        if (activeTool === ToolType.VOICE_STUDIO) {
-            // Text to Voice Chat
-            const audioData = await generateVoiceChat(prompt, 'TEXT');
-            res = { audioUrl: `data:audio/mp3;base64,${audioData}`, text: prompt }; 
-        } 
-        else {
-            // Creative Image/Text/Code tools
-            res = await generateCreativeContent(
-                activeTool, 
-                prompt, 
-                uploadedImage?.data, 
-                uploadedImage?.mimeType
-            );
-        }
-
-        if (res) {
-            setResult(res);
-            saveProject(res);
-        }
-
-    } catch (err: any) {
-        console.error(err);
-        alert(err.message || "Something went wrong.");
-    } finally {
-        setIsLoading(false);
-    }
-  };
-
-  // Voice Chat (Audio to Audio) Logic
-  const startRecording = async () => {
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        
-        // Use a supported mime type for the browser
-        let mimeType = 'audio/webm';
-        if (MediaRecorder.isTypeSupported('audio/webm')) {
-            mimeType = 'audio/webm';
-        } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
-            mimeType = 'audio/mp4';
-        }
-
-        const mediaRecorder = new MediaRecorder(stream, { mimeType });
-        mediaRecorderRef.current = mediaRecorder;
-        audioChunksRef.current = [];
-
-        mediaRecorder.ondataavailable = (event) => {
-            if (event.data.size > 0) {
-                audioChunksRef.current.push(event.data);
-            }
-        };
-
-        mediaRecorder.onstop = async () => {
-            const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-            
-            // Convert to base64
-            const reader = new FileReader();
-            reader.readAsDataURL(audioBlob);
-            reader.onloadend = async () => {
-                const base64String = reader.result as string;
-                // Safely extract base64 data regardless of mime type prefix
-                const base64Data = base64String.split(',')[1];
-                
-                setIsLoading(true);
-                try {
-                    // Send with generic key or specific if needed, handle mime in service
-                    const responseAudio = await generateVoiceChat({ audioData: base64Data }, 'AUDIO');
-                    const res = { audioUrl: `data:audio/wav;base64,${responseAudio}` };
-                    setResult(res);
-                    saveProject(res);
-                } catch (e) {
-                    console.error("Voice Error", e);
-                    alert("Voice chat failed. Please try again.");
-                } finally {
-                    setIsLoading(false);
-                }
-            };
-        };
-
-        mediaRecorder.start();
-        setIsRecording(true);
     } catch (e) {
-        alert("Microphone access denied. Please allow microphone permissions.");
+      alert("Something went wrong. Please try again.");
+    } finally {
+      setIsGenerating(false);
     }
   };
 
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-        mediaRecorderRef.current.stop();
-        setIsRecording(false);
-    }
-  };
+  const handleVoiceChat = async (input: string | { audioData: string }) => {
+     setIsGenerating(true);
+     try {
+         const res = await generateVoiceChat(input);
+         const audioUrl = `data:audio/wav;base64,${res.audioData}`;
+         setResult({ audioUrl: audioUrl, text: res.text });
+         
+         const newProject: Project = {
+             id: crypto.randomUUID(),
+             name: `Voice Chat`,
+             type: ToolType.VOICE_STUDIO,
+             content: res.text,
+             mediaUrl: audioUrl,
+             createdAt: Date.now()
+         };
+         setProjects(prev => [newProject, ...prev]);
 
-  const handleImageUpload = (base64: string, type: string) => {
-     if (!base64) {
-         setUploadedImage(null);
-     } else {
-         setUploadedImage({ data: base64, mimeType: type });
+     } catch (e) {
+         console.error(e);
+     } finally {
+         setIsGenerating(false);
      }
   };
 
-  // Switch Tool Clear State
-  useEffect(() => {
-    setPrompt('');
-    setResult(null);
-    setUploadedImage(null);
-    setIsLoading(false);
-    setVoiceMode('TEXT_INPUT'); 
-  }, [activeTool]);
+  const toggleRecording = async () => {
+      if (isRecording) {
+          mediaRecorderRef.current?.stop();
+          setIsRecording(false);
+      } else {
+          try {
+              const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+              const mimeType = 'audio/webm'; 
+              const mediaRecorder = new MediaRecorder(stream, { mimeType });
+              mediaRecorderRef.current = mediaRecorder;
+              audioChunksRef.current = [];
 
+              mediaRecorder.ondataavailable = (event) => {
+                  if (event.data.size > 0) {
+                      audioChunksRef.current.push(event.data);
+                  }
+              };
 
-  // --- Render: Onboarding ---
-  if (!isOnboarded) {
+              mediaRecorder.onstop = async () => {
+                  const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+                  const reader = new FileReader();
+                  reader.readAsDataURL(audioBlob);
+                  reader.onloadend = () => {
+                      const base64String = reader.result as string;
+                      const base64Data = base64String.split(',')[1];
+                      handleVoiceChat({ audioData: base64Data });
+                  };
+                  stream.getTracks().forEach(track => track.stop());
+              };
+
+              mediaRecorder.start();
+              setIsRecording(true);
+          } catch (e) {
+              alert("Microphone access denied or not available.");
+          }
+      }
+  };
+
+  const handleDownload = (project: Project) => {
+      const link = document.createElement('a');
+      if (project.mediaUrl && project.type !== ToolType.WEBSITE_DESIGNER && project.type !== ToolType.POSTER_DESIGNER) {
+          link.href = project.mediaUrl;
+          link.download = `samayan-${project.type.toLowerCase()}-${Date.now()}.${project.type === ToolType.VOICE_STUDIO ? 'wav' : 'png'}`;
+      } else if (project.html) {
+          const blob = new Blob([project.html], { type: 'text/html' });
+          link.href = URL.createObjectURL(blob);
+          link.download = `samayan-design-${Date.now()}.html`;
+      }
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+  };
+
+  const handleDelete = (id: string) => {
+      const updated = projects.filter(p => p.id !== id);
+      setProjects(updated);
+      localStorage.setItem('samayan_projects', JSON.stringify(updated));
+      if (selectedProject?.id === id) setSelectedProject(null);
+  };
+
+  const renderCustomLoader = () => {
+     if (activeTool === ToolType.VOICE_STUDIO) {
+         return (
+             <div className="flex flex-col items-center justify-center h-full gap-8 bg-black/90 text-white">
+                 <div className="flex items-center gap-1 h-12">
+                     {[...Array(5)].map((_, i) => (
+                         <div key={i} className="w-3 bg-green-500 rounded-full animate-bounce" style={{ height: '100%', animationDelay: `${i * 0.1}s` }}></div>
+                     ))}
+                 </div>
+                 <h2 className="text-2xl font-bold tracking-widest uppercase">Samayan Voice Studio</h2>
+             </div>
+         );
+     } 
+     if (activeTool === ToolType.WEBSITE_DESIGNER) {
+         return (
+             <div className="flex flex-col items-center justify-center h-full gap-8 bg-slate-900 text-white font-mono">
+                 <div className="relative w-20 h-20">
+                     <div className="absolute inset-0 border-4 border-blue-500 rounded-lg animate-ping"></div>
+                     <Code className="absolute inset-0 m-auto text-blue-400 w-8 h-8 animate-pulse" />
+                 </div>
+                 <h2 className="text-2xl font-bold">Samayan Web Designer</h2>
+             </div>
+         );
+     }
+     if (activeTool === ToolType.ANIMATION_3D) {
+         return (
+             <div className="flex flex-col items-center justify-center h-full gap-8 bg-gray-900 text-white">
+                 <div className="w-16 h-16 border-4 border-pink-500 animate-[spin_3s_linear_infinite]"></div>
+                 <h2 className="text-2xl font-bold">Samayan 3D Lab</h2>
+             </div>
+         );
+     }
+     return (
+         <div className="flex flex-col items-center justify-center h-full gap-6 bg-white/95">
+             <div className="relative">
+                <div className={`absolute inset-0 bg-sky-200 rounded-full blur-xl opacity-60 animate-pulse`}></div>
+                <div className="relative z-10 bg-white p-4 rounded-full shadow-xl">
+                   <Sparkles className={`w-12 h-12 text-sky-500 animate-[spin_4s_linear_infinite]`} />
+                </div>
+             </div>
+             <div className="text-center">
+                 <h2 className="text-2xl font-bold text-navy">Samayan Ad AI Lab</h2>
+                 <p className="text-gray-500 mt-2 font-medium">Loading Tool...</p>
+             </div>
+         </div>
+     );
+  };
+
+  if (showSurprise) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-        <div className="bg-white max-w-md w-full rounded-2xl p-8 shadow-2xl text-center fade-in">
-          <div className="w-16 h-16 bg-sky-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-sky-500/30">
-            <User className="w-8 h-8 text-white" />
-          </div>
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">Samayan AI Lab</h1>
-          <p className="text-slate-500 mb-8">Creative Studio: Ads, Web, Voice & 3D</p>
-          
-          <div className="space-y-4 text-left">
-            <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Apka Naam Kya Hai?</label>
-                <input 
-                  type="text" 
-                  value={tempName}
-                  onChange={(e) => setTempName(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg p-3 focus:ring-2 focus:ring-sky-500 focus:outline-none"
-                  placeholder="Enter your name to start"
-                />
-                {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
-            </div>
-            <Button className="w-full" onClick={handleOnboarding}>
-              Enter Studio
-            </Button>
-          </div>
+      <div className="fixed inset-0 bg-gradient-to-br from-sky-100 to-white flex items-center justify-center overflow-hidden z-50">
+        <Balloons />
+        <Confetti />
+        <div className="text-center z-10 animate-bounce-slow">
+          <h1 className="text-6xl font-extrabold text-navy drop-shadow-lg">Surprise!</h1>
+          <p className="text-2xl text-sky-600 mt-4 font-semibold">Welcome, {userName}!</p>
         </div>
       </div>
     );
   }
 
-  // --- Render: Main App ---
+  if (!isOnboarded) {
+    return (
+      <div className="min-h-screen bg-lightgrey-50 text-softblack font-sans relative">
+        <nav className="flex justify-between items-center px-6 py-5 max-w-7xl mx-auto">
+          <div className="flex items-center gap-2">
+            <div className="w-10 h-10 bg-navy rounded-lg flex items-center justify-center text-white font-bold text-xl shadow-lg">S</div>
+            <span className="text-2xl font-bold text-navy tracking-tight">Samayan Ad AI Lab</span>
+          </div>
+        </nav>
+
+        {/* HERO SECTION WITH DIRECT NAME INPUT */}
+        <LandingSection className="text-center pt-20 pb-20 relative overflow-hidden min-h-[70vh] flex flex-col items-center justify-center">
+            <div className="absolute top-0 left-1/4 w-72 h-72 bg-sky-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
+            <div className="absolute top-0 right-1/4 w-72 h-72 bg-purple-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
+
+            <div className="relative z-10 max-w-2xl mx-auto w-full">
+                <h1 className="text-5xl md:text-7xl font-extrabold text-navy leading-tight mb-8">
+                    What is your <span className="text-sky-500">name?</span>
+                </h1>
+                
+                <div className="bg-white p-8 rounded-3xl shadow-2xl border border-gray-100 mx-4 relative overflow-hidden transform transition-all hover:scale-[1.01]">
+                   <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-sky-400 to-navy"></div>
+                   
+                   <div className="space-y-6">
+                      <div className="relative">
+                          <input
+                            type="text"
+                            placeholder="Enter your name to start..."
+                            className={`w-full text-center text-2xl font-bold p-5 rounded-2xl border-2 bg-gray-50 focus:bg-white focus:ring-4 outline-none transition-all ${errorMsg ? 'border-red-500 focus:ring-red-200' : 'border-gray-100 focus:ring-sky-100 focus:border-sky-400'}`}
+                            value={tempName}
+                            onChange={(e) => {
+                                setTempName(e.target.value);
+                                setErrorMsg('');
+                            }}
+                            onKeyDown={(e) => e.key === 'Enter' && handleNameSubmit()}
+                            autoFocus
+                          />
+                      </div>
+                      
+                      {errorMsg && (
+                          <div className="text-center text-red-500 font-semibold animate-pulse flex items-center justify-center gap-2">
+                              <X className="w-4 h-4" /> {errorMsg}
+                          </div>
+                      )}
+
+                      <Button onClick={handleNameSubmit} className="w-full justify-center py-5 text-xl font-bold shadow-lg shadow-sky-200 hover:shadow-sky-300 rounded-2xl">
+                        Enter App <ArrowRight className="w-6 h-6 ml-2" />
+                      </Button>
+                   </div>
+                </div>
+            </div>
+        </LandingSection>
+
+        {/* Simplified Info Sections */}
+        <LandingSection className="pt-0">
+             <div className="grid md:grid-cols-3 gap-8 opacity-60 hover:opacity-100 transition-opacity duration-500">
+                 {[
+                     { icon: Monitor, title: "Web Design" },
+                     { icon: Palette, title: "Ad Creator" },
+                     { icon: Mic, title: "Voice Studio" }
+                 ].map((service, idx) => (
+                     <div key={idx} className="bg-white p-6 rounded-2xl shadow-sm text-center border border-gray-100">
+                         <service.icon className="w-8 h-8 text-sky-500 mx-auto mb-3" />
+                         <h3 className="font-bold text-navy">{service.title}</h3>
+                     </div>
+                 ))}
+             </div>
+        </LandingSection>
+      </div>
+    );
+  }
+
+  const tools = [
+    { id: ToolType.AD_CREATOR, icon: Palette, label: 'Ad Creator', desc: 'Create stunning advertisements' },
+    { id: ToolType.LOGO_DESIGNER, icon: Sparkles, label: 'Logo Designer', desc: 'Design professional logos' },
+    { id: ToolType.WEBSITE_DESIGNER, icon: Monitor, label: 'Web Designer', desc: 'Build responsive websites' },
+    { id: ToolType.IMAGE_LAB, icon: ImageIcon, label: 'Image Lab', desc: 'Edit and enhance photos' },
+    { id: ToolType.VOICE_STUDIO, icon: Mic, label: 'Voice Studio', desc: 'AI Voice & Speech' },
+    { id: ToolType.ANIMATION_3D, icon: Box, label: '3D Animation', desc: 'Render 3D scenes' },
+    { id: ToolType.THUMBNAIL_DESIGNER, icon: Layout, label: 'Thumbnail', desc: 'YouTube Thumbnails' },
+    { id: ToolType.POSTER_DESIGNER, icon: Square, label: 'Poster', desc: 'Design Posters (Urdu Supported)' },
+  ];
+
+  const currentToolData = tools.find(t => t.id === activeTool);
+
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden">
-      
-      {/* Sidebar */}
-      <aside className={`${isSidebarOpen ? 'w-72' : 'w-0'} bg-slate-900 text-slate-300 flex flex-col transition-all duration-300 ease-in-out overflow-hidden z-20`}>
-        <div className="p-6 border-b border-slate-800 flex items-center gap-3">
-            <div className="w-8 h-8 bg-sky-500 rounded-lg flex items-center justify-center shrink-0">
-                <span className="font-bold text-white">S</span>
-            </div>
-            <h1 className="font-bold text-xl text-white tracking-tight whitespace-nowrap">Samayan AI Lab</h1>
+    <div className="flex h-screen bg-lightgrey-50 text-softblack overflow-hidden">
+      {/* Sidebar - Visible on MD (Tablet/Desktop) */}
+      <aside className={`fixed inset-y-0 left-0 z-40 w-72 bg-navy transform transition-transform duration-300 ease-in-out md:translate-x-0 md:static md:inset-0 ${sidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'} flex flex-col border-r border-navy-light`}>
+        <div className="p-6 border-b border-navy-light/50 flex justify-between items-center">
+           <div className="flex items-center gap-3">
+               <div className="w-10 h-10 bg-sky-500 rounded-xl flex items-center justify-center font-bold text-white shadow-lg shadow-sky-500/30 text-xl">S</div>
+               <div>
+                   <h1 className="font-bold text-xl text-white tracking-tight leading-none">Samayan AI</h1>
+                   <span className="text-xs text-sky-400 font-medium tracking-widest uppercase">Laboratory</span>
+               </div>
+           </div>
+           <button onClick={() => setSidebarOpen(false)} className="md:hidden text-white/70 hover:text-white">
+              <X className="w-6 h-6" />
+           </button>
+        </div>
+        
+        <div className="flex-1 overflow-y-auto px-4 py-6 space-y-2 custom-scrollbar">
+          <SidebarItem 
+            active={activeTool === ToolType.DASHBOARD} 
+            icon={Layout} 
+            label="Dashboard" 
+            onClick={() => handleToolSwitch(ToolType.DASHBOARD)} 
+          />
+          
+          <div className="pt-6 pb-2 px-2 text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+             <span>Creative Tools</span> <span className="flex-1 h-px bg-white/10"></span>
+          </div>
+          
+          {tools.map((tool) => (
+            <SidebarItem 
+              key={tool.id}
+              active={activeTool === tool.id}
+              icon={tool.icon}
+              label={tool.label} 
+              onClick={() => handleToolSwitch(tool.id)}
+            />
+          ))}
         </div>
 
-        <div className="flex-1 overflow-y-auto py-6 px-3 space-y-1">
-            <SidebarItem active={activeTool === ToolType.DASHBOARD} icon={Layout} label="Dashboard" onClick={() => setActiveTool(ToolType.DASHBOARD)} />
-            <div className="px-4 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mt-4">Design Tools</div>
-            <SidebarItem active={activeTool === ToolType.AD_CREATOR} icon={Palette} label="Ad Creator" onClick={() => setActiveTool(ToolType.AD_CREATOR)} />
-            <SidebarItem active={activeTool === ToolType.LOGO_DESIGNER} icon={Palette} label="Logo Designer" onClick={() => setActiveTool(ToolType.LOGO_DESIGNER)} />
-            <SidebarItem active={activeTool === ToolType.THUMBNAIL_DESIGNER} icon={ImageIcon} label="Thumbnail Designer" onClick={() => setActiveTool(ToolType.THUMBNAIL_DESIGNER)} />
-            <SidebarItem active={activeTool === ToolType.POSTER_DESIGNER} icon={Layout} label="Poster Designer" onClick={() => setActiveTool(ToolType.POSTER_DESIGNER)} />
-            <div className="px-4 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mt-4">Advanced Studio</div>
-            <SidebarItem active={activeTool === ToolType.WEBSITE_DESIGNER} icon={Monitor} label="Website Designer" onClick={() => setActiveTool(ToolType.WEBSITE_DESIGNER)} />
-            <SidebarItem active={activeTool === ToolType.IMAGE_LAB} icon={ImageIcon} label="Image Lab (Editor)" onClick={() => setActiveTool(ToolType.IMAGE_LAB)} />
-            <SidebarItem active={activeTool === ToolType.VOICE_STUDIO} icon={Mic} label="Voice Studio" onClick={() => setActiveTool(ToolType.VOICE_STUDIO)} />
-            <SidebarItem active={activeTool === ToolType.ANIMATION_3D} icon={Video} label="3D Animation (Images)" onClick={() => setActiveTool(ToolType.ANIMATION_3D)} />
-            <div className="px-4 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mt-4">Storage</div>
-            <SidebarItem active={activeTool === ToolType.MY_PROJECTS} icon={FolderOpen} label="My Projects" onClick={() => setActiveTool(ToolType.MY_PROJECTS)} />
-        </div>
-
-        <div className="p-4 border-t border-slate-800">
-            <div className="flex items-center gap-3 px-2">
-                <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs text-white">
-                    {userName.charAt(0).toUpperCase()}
-                </div>
-                <div className="overflow-hidden">
-                    <p className="text-sm font-medium text-white truncate">{userName}</p>
-                    <p className="text-xs text-slate-500">Pro User</p>
-                </div>
-                <button onClick={() => window.location.reload()} className="ml-auto text-slate-500 hover:text-white">
-                    <LogOut className="w-4 h-4" />
-                </button>
-            </div>
+        <div className="p-4 bg-navy-light/20 border-t border-white/5">
+             <SidebarItem 
+                active={activeTool === ToolType.MY_PROJECTS} 
+                icon={FolderOpen} 
+                label="My Projects" 
+                onClick={() => handleToolSwitch(ToolType.MY_PROJECTS)} 
+              />
         </div>
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col overflow-hidden relative">
-        {/* Header */}
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 z-10">
-            <button onClick={() => setSidebarOpen(!isSidebarOpen)} className="p-2 hover:bg-slate-100 rounded-lg text-slate-600">
-                <Menu className="w-5 h-5" />
-            </button>
-            <div className="text-sm text-slate-500">
-                Samayan AI Lab v2.4
-            </div>
+      <div className="flex-1 flex flex-col h-screen overflow-hidden bg-lightgrey-50 relative w-full">
+        
+        {isToolLoading && (
+           <div className="absolute inset-0 z-50 animate-in fade-in duration-300">
+               {renderCustomLoader()}
+           </div>
+        )}
+
+        {/* Mobile Header (Only visible on small screens) */}
+        <header className="h-16 bg-white border-b border-lightgrey flex items-center justify-between px-4 md:hidden z-20 shadow-sm flex-shrink-0">
+           <div className="flex items-center gap-3">
+              <button onClick={() => setSidebarOpen(true)} className="p-2 text-navy hover:bg-gray-100 rounded-lg">
+                 <Menu className="w-6 h-6" />
+              </button>
+              <span className="font-bold text-navy truncate">Samayan AI</span>
+           </div>
         </header>
 
+        {/* Sidebar Overlay for Mobile */}
+        {sidebarOpen && (
+           <div className="fixed inset-0 bg-navy/80 z-30 md:hidden backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
+        )}
+
         {/* Workspace */}
-        <div className="flex-1 overflow-y-auto p-6 scroll-smooth">
-            
-            {activeTool === ToolType.DASHBOARD && (
-                <div className="max-w-4xl mx-auto fade-in">
-                    <FeatureHeader title={`Hello, ${userName}`} subtitle="Select a tool to start creating" />
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {[
-                            { t: ToolType.AD_CREATOR, l: "Ad Creator", d: "Marketing & Social Ads", i: Palette, c: "bg-purple-100 text-purple-600" },
-                            { t: ToolType.WEBSITE_DESIGNER, l: "Website Designer", d: "Generate HTML Websites", i: Monitor, c: "bg-blue-100 text-blue-600" },
-                            { t: ToolType.ANIMATION_3D, l: "3D Animation", d: "Create 3D Rendered Images", i: Video, c: "bg-pink-100 text-pink-600" },
-                            { t: ToolType.VOICE_STUDIO, l: "Voice Studio", d: "Talk via Text or Voice", i: Mic, c: "bg-green-100 text-green-600" },
-                            { t: ToolType.LOGO_DESIGNER, l: "Logo Designer", d: "Brand Identity", i: Palette, c: "bg-orange-100 text-orange-600" },
-                            { t: ToolType.IMAGE_LAB, l: "Image Lab", d: "Upload & Edit Images", i: ImageIcon, c: "bg-indigo-100 text-indigo-600" },
-                        ].map((card, idx) => (
-                            <button 
-                                key={idx} 
-                                onClick={() => setActiveTool(card.t)}
-                                className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-xl transition-all text-left group"
-                            >
-                                <div className={`w-12 h-12 rounded-xl ${card.c} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
-                                    <card.i className="w-6 h-6" />
-                                </div>
-                                <h3 className="font-bold text-slate-900">{card.l}</h3>
-                                <p className="text-sm text-slate-500 mt-1">{card.d}</p>
-                            </button>
-                        ))}
-                    </div>
+        <main className="flex-1 overflow-y-auto p-4 md:p-8 relative custom-scrollbar">
+           
+           {/* DASHBOARD VIEW */}
+           {activeTool === ToolType.DASHBOARD && (
+             <div className="max-w-6xl mx-auto fade-in pb-10">
+                <div className="mb-10 text-center pt-8">
+                   <h1 className="text-4xl font-extrabold text-navy">Welcome, {userName}!</h1>
+                   <p className="text-gray-500 mt-2 text-lg">Select a tool to start creating.</p>
                 </div>
-            )}
-
-            {activeTool === ToolType.MY_PROJECTS && (
-                <div className="max-w-6xl mx-auto fade-in pb-20">
-                    <FeatureHeader title="My Projects" subtitle="View, Download or Delete your creations" />
-                    {projects.length === 0 ? (
-                        <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-slate-300">
-                            <FolderOpen className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                            <p className="text-slate-500">No projects yet. Create something new!</p>
-                            <Button className="mt-4 mx-auto" onClick={() => setActiveTool(ToolType.DASHBOARD)}>
-                                Go to Dashboard
-                            </Button>
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                            {projects.map((proj) => (
-                                <div 
-                                    key={proj.id} 
-                                    onClick={() => setSelectedProject(proj)}
-                                    className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-lg transition-all cursor-pointer flex flex-col group h-80 relative"
-                                >
-                                    <div className="flex-1 bg-slate-100 relative overflow-hidden flex items-center justify-center">
-                                        {proj.mediaUrl && (proj.mediaUrl.startsWith('data:image') || proj.mediaUrl.startsWith('http')) ? (
-                                            <img src={proj.mediaUrl} className="w-full h-full object-cover" alt="project" />
-                                        ) : proj.html ? (
-                                            <div className="w-full h-full bg-white relative">
-                                                <div className="absolute inset-0 transform scale-[0.25] origin-top-left w-[400%] h-[400%] pointer-events-none opacity-80">
-                                                    <iframe srcDoc={proj.html} className="w-full h-full" title="prev" />
-                                                </div>
-                                                <div className="absolute inset-0 bg-transparent" />
-                                            </div>
-                                        ) : proj.mediaUrl && proj.mediaUrl.startsWith('data:audio') ? (
-                                             <div className="flex flex-col items-center justify-center w-full h-full bg-gradient-to-br from-sky-50 to-indigo-50">
-                                                <Mic className="w-12 h-12 text-sky-400 mb-2" />
-                                                <span className="text-xs text-sky-600 font-medium bg-white/50 px-2 py-1 rounded">Audio Project</span>
-                                             </div>
-                                        ) : (
-                                            <div className="p-4 w-full h-full bg-slate-50 flex items-center justify-center text-center">
-                                                <span className="text-xs text-slate-400 line-clamp-4">{proj.content}</span>
-                                            </div>
-                                        )}
-                                        
-                                        {/* Overlay Hover Effect (Visual only) */}
-                                        <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
-                                            <Eye className="text-white drop-shadow-md w-8 h-8 opacity-80" />
-                                        </div>
-                                    </div>
-                                    
-                                    <div className="p-3 border-t border-slate-100 flex flex-col justify-between bg-white h-24">
-                                        <div className="mb-1">
-                                            <div className="flex justify-between items-center mb-1">
-                                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{proj.type.replace(/_/g, ' ')}</span>
-                                                <span className="text-[10px] text-slate-400">{new Date(proj.createdAt).toLocaleDateString()}</span>
-                                            </div>
-                                            <h4 className="font-semibold text-slate-800 truncate text-sm" title={proj.name}>{proj.name}</h4>
-                                        </div>
-
-                                        {/* Action Buttons - Always Visible */}
-                                        <div className="flex gap-2 mt-auto pt-2 border-t border-slate-50 z-10 relative">
-                                            <button 
-                                                onClick={(e) => handleDownloadProject(e, proj)}
-                                                className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-slate-100 hover:bg-sky-50 text-slate-600 hover:text-sky-600 rounded text-xs font-medium transition-colors"
-                                                title="Download"
-                                            >
-                                                <Download className="w-3 h-3" /> Save
-                                            </button>
-                                            <button 
-                                                onClick={(e) => handleDeleteProject(e, proj.id)}
-                                                className="flex items-center justify-center px-3 py-1.5 bg-slate-100 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded transition-colors"
-                                                title="Delete"
-                                            >
-                                                <Trash2 className="w-3 h-3" />
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                   {tools.map((tool) => (
+                      <button 
+                        key={tool.id}
+                        onClick={() => handleToolSwitch(tool.id)}
+                        className="bg-white p-6 rounded-3xl shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all border border-gray-100 flex flex-col items-center gap-5 group text-center h-full justify-center aspect-square"
+                      >
+                         <div className="w-20 h-20 rounded-full bg-sky-50 group-hover:bg-sky-500 flex items-center justify-center transition-all duration-300 shadow-inner group-hover:shadow-lg">
+                            <tool.icon className="w-10 h-10 text-sky-600 group-hover:text-white transition-colors" />
+                         </div>
+                         <div>
+                             <span className="block font-bold text-navy text-lg group-hover:text-sky-600 transition-colors">{tool.label}</span>
+                         </div>
+                      </button>
+                   ))}
                 </div>
-            )}
+             </div>
+           )}
 
-            {/* Creative Tools View */}
-            {activeTool !== ToolType.DASHBOARD && activeTool !== ToolType.MY_PROJECTS && (
-                <div className="max-w-6xl mx-auto flex flex-col xl:flex-row gap-8 fade-in h-[calc(100vh-140px)]">
-                    {/* Input Section */}
-                    <div className="w-full xl:w-1/3 shrink-0 flex flex-col gap-6 overflow-y-auto pr-2 pb-6">
-                        <FeatureHeader 
-                            title={activeTool.replace(/_/g, ' ')} 
-                            subtitle={
-                                activeTool === ToolType.ANIMATION_3D ? "Create stunning 3D rendered images (Pixar style)." :
-                                activeTool === ToolType.WEBSITE_DESIGNER ? "Describe your website to get HTML code & design." :
-                                activeTool === ToolType.VOICE_STUDIO ? "Chat with AI using Text or Voice." :
-                                "Create professional designs instantly."
-                            } 
-                        />
-                        
-                        {activeTool === ToolType.VOICE_STUDIO && (
-                            <div className="flex gap-2 bg-slate-200 p-1 rounded-xl">
-                                <button 
-                                    onClick={() => setVoiceMode('TEXT_INPUT')} 
-                                    className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-lg transition-all ${voiceMode === 'TEXT_INPUT' ? 'bg-white shadow text-slate-900' : 'text-slate-500'}`}
-                                >
-                                    <Keyboard className="w-4 h-4" /> Text se baat
-                                </button>
-                                <button 
-                                    onClick={() => setVoiceMode('AUDIO_INPUT')} 
-                                    className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-lg transition-all ${voiceMode === 'AUDIO_INPUT' ? 'bg-white shadow text-slate-900' : 'text-slate-500'}`}
-                                >
-                                    <Mic className="w-4 h-4" /> Voice se baat
-                                </button>
-                            </div>
-                        )}
+           {/* MY PROJECTS VIEW */}
+           {activeTool === ToolType.MY_PROJECTS && (
+              <div className="max-w-7xl mx-auto fade-in pb-10">
+                  <ToolCenteredHeader icon={FolderOpen} title="My Projects" subtitle="Manage and download your saved creations" />
+                  
+                  {projects.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center h-64 bg-white rounded-3xl border-2 border-dashed border-gray-200">
+                          <p className="text-gray-400 text-lg font-medium">Your gallery is empty.</p>
+                          <Button className="mt-4" onClick={() => handleToolSwitch(ToolType.DASHBOARD)}>Start Creating</Button>
+                      </div>
+                  ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                          {projects.map((project) => (
+                              <div key={project.id} className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all border border-gray-100 flex flex-col group">
+                                  <div 
+                                    className="h-56 bg-gray-100 relative cursor-pointer flex items-center justify-center overflow-hidden"
+                                    onClick={() => setSelectedProject(project)}
+                                  >
+                                      {project.mediaUrl && !project.mediaUrl.startsWith('data:audio') ? (
+                                          <img src={project.mediaUrl} alt={project.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                      ) : project.type === ToolType.WEBSITE_DESIGNER || project.type === ToolType.POSTER_DESIGNER ? (
+                                          <div className="flex flex-col items-center text-gray-400">
+                                              <Monitor className="w-16 h-16 mb-2 text-sky-300" />
+                                              <span className="text-sm font-bold uppercase tracking-wider">Web Preview</span>
+                                          </div>
+                                      ) : project.type === ToolType.VOICE_STUDIO ? (
+                                          <div className="flex flex-col items-center text-gray-400">
+                                              <Music className="w-16 h-16 mb-2 text-sky-300" />
+                                              <span className="text-sm font-bold uppercase tracking-wider">Audio Recording</span>
+                                          </div>
+                                      ) : (
+                                          <span className="text-gray-400">No Preview</span>
+                                      )}
+                                      <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                          <span className="bg-white text-navy px-4 py-2 rounded-full font-bold shadow-lg flex items-center gap-2 text-sm">
+                                              <Maximize2 className="w-4 h-4" /> Open View
+                                          </span>
+                                      </div>
+                                  </div>
 
-                        <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-100">
-                             {activeTool === ToolType.VOICE_STUDIO && voiceMode === 'AUDIO_INPUT' ? (
-                                <div className="text-center py-10">
-                                    <div className={`w-32 h-32 rounded-full mx-auto mb-8 flex items-center justify-center transition-all ${isRecording ? 'bg-red-50 animate-pulse ring-8 ring-red-50' : 'bg-slate-50'}`}>
-                                        <Mic className={`w-12 h-12 ${isRecording ? 'text-red-500' : 'text-slate-400'}`} />
-                                    </div>
-                                    <p className="text-slate-600 mb-8 font-medium">
-                                        {isRecording ? "Listening... Speak now" : "Click Start to talk"}
-                                    </p>
-                                    <Button 
-                                        onClick={isRecording ? stopRecording : startRecording} 
-                                        variant={isRecording ? 'danger' : 'primary'}
-                                        className="w-full py-4 text-lg"
-                                        isLoading={isLoading}
+                                  <div className="p-5 flex flex-col flex-1">
+                                      <div className="flex-1 mb-4">
+                                          <h3 className="font-bold text-navy text-lg truncate">{project.name}</h3>
+                                          <span className="text-xs text-gray-400 font-semibold uppercase">{project.type.replace(/_/g, ' ')}</span>
+                                      </div>
+                                      
+                                      <div className="grid grid-cols-2 gap-3">
+                                          <Button variant="secondary" onClick={() => handleDownload(project)} className="w-full py-2 text-sm font-semibold bg-sky-50 text-sky-700 hover:bg-sky-100">
+                                              Save Image
+                                          </Button>
+                                          <button 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleDelete(project.id);
+                                            }}
+                                            className="bg-red-50 hover:bg-red-100 text-red-600 rounded-xl px-4 py-2 flex items-center justify-center gap-2 font-semibold text-sm transition-colors border border-red-100"
+                                          >
+                                              <Trash2 className="w-4 h-4" /> Delete
+                                          </button>
+                                      </div>
+                                  </div>
+                              </div>
+                          ))}
+                      </div>
+                  )}
+              </div>
+           )}
+
+           {/* CREATIVE TOOLS VIEW */}
+           {activeTool !== ToolType.DASHBOARD && activeTool !== ToolType.MY_PROJECTS && currentToolData && (
+             <div className="max-w-4xl mx-auto pb-20">
+               {/* CENTERED LOGO & TITLE REQUESTED BY USER */}
+               <ToolCenteredHeader 
+                  icon={currentToolData.icon} 
+                  title={currentToolData.label} 
+                  subtitle={currentToolData.desc} 
+               />
+
+               <div className="flex flex-col gap-8 fade-in" style={{ animationDelay: '0.2s' }}>
+                 {activeTool === ToolType.VOICE_STUDIO ? (
+                    <div className="bg-white p-8 rounded-3xl shadow-sm border border-lightgrey text-center relative overflow-hidden">
+                        <div className="flex justify-center gap-4 mb-8 bg-lightgrey-50 p-1.5 rounded-2xl inline-flex mx-auto border border-gray-200">
+                             <button 
+                                onClick={() => setVoiceMode('audio')}
+                                className={`px-6 py-2.5 rounded-xl font-semibold text-sm transition-all ${voiceMode === 'audio' ? 'bg-white shadow-md text-navy' : 'text-gray-500 hover:text-navy'}`}
+                             >
+                                🎙️ Talk via Voice
+                             </button>
+                             <button 
+                                onClick={() => setVoiceMode('text')}
+                                className={`px-6 py-2.5 rounded-xl font-semibold text-sm transition-all ${voiceMode === 'text' ? 'bg-white shadow-md text-navy' : 'text-gray-500 hover:text-navy'}`}
+                             >
+                                ⌨️ Talk via Text
+                             </button>
+                        </div>
+
+                        {voiceMode === 'audio' ? (
+                            <div className="py-8">
+                                <div className="relative inline-block">
+                                    {isRecording && <div className="absolute inset-0 bg-red-400 rounded-full animate-ping opacity-75"></div>}
+                                    <button 
+                                        onClick={toggleRecording}
+                                        className={`relative z-10 w-24 h-24 rounded-full flex items-center justify-center transition-all duration-300 ${isRecording ? 'bg-red-500 shadow-xl scale-105' : 'bg-navy hover:bg-navy-light shadow-xl hover:-translate-y-1'}`}
                                     >
-                                        {isRecording ? "Stop Recording" : "Start Conversation"}
-                                    </Button>
+                                        {isRecording ? <Square className="w-10 h-10 text-white" /> : <Mic className="w-10 h-10 text-white" />}
+                                    </button>
                                 </div>
-                             ) : (
-                                <>
-                                    <label className="block text-sm font-semibold text-slate-700 mb-3">
-                                        {activeTool === ToolType.IMAGE_LAB ? "Upload Image & Instructions" : 
-                                         activeTool === ToolType.VOICE_STUDIO ? "Type your message" :
-                                         "Describe your idea"}
-                                    </label>
-                                    <InputArea 
-                                        value={prompt} 
-                                        onChange={setPrompt} 
-                                        onImageUpload={handleImageUpload}
-                                        onSend={handleGenerate}
-                                        isLoading={isLoading}
-                                        placeholder={
-                                            activeTool === ToolType.LOGO_DESIGNER ? "Minimalist fox logo, orange gradient..." :
-                                            activeTool === ToolType.WEBSITE_DESIGNER ? "Portfolio website for a photographer, black background..." :
-                                            activeTool === ToolType.ANIMATION_3D ? "Cute robot in futuristic city, 3D render..." :
-                                            activeTool === ToolType.VOICE_STUDIO ? "Hello, how are you today?" :
-                                            "Type here..."
-                                        }
-                                        imagePreview={uploadedImage?.data}
-                                    />
-                                </>
-                             )}
-                             
-                             {activeTool !== ToolType.VOICE_STUDIO && (
-                                <div className="mt-4 bg-sky-50 p-4 rounded-xl text-xs text-sky-800 border border-sky-100 flex items-start gap-2">
-                                    <div className="mt-0.5"><div className="w-1.5 h-1.5 rounded-full bg-sky-500" /></div>
-                                    <span>
-                                        {activeTool === ToolType.WEBSITE_DESIGNER ? "Describe layout and colors for best website results." :
-                                         activeTool === ToolType.ANIMATION_3D ? "Generates high quality 3D images (not video)." :
-                                         "Uploads are optional. Describe clearly for best results."}
-                                    </span>
-                                </div>
-                             )}
-                        </div>
+                                <p className="mt-6 text-gray-500 font-medium">
+                                    {isRecording ? "Listening... Tap to stop" : "Tap microphone to start speaking"}
+                                </p>
+                            </div>
+                        ) : (
+                            <InputArea 
+                                value={prompt} 
+                                onChange={setPrompt} 
+                                onImageUpload={() => {}} 
+                                onSend={() => handleVoiceChat(prompt)} 
+                                isLoading={isGenerating} 
+                                placeholder="Type your message here..."
+                            />
+                        )}
                     </div>
+                 ) : (
+                    <InputArea 
+                        value={prompt}
+                        onChange={setPrompt}
+                        onImageUpload={(base64, type) => {
+                            setImageBase64(base64);
+                            setImageMimeType(type);
+                        }}
+                        onSend={handleGenerate}
+                        isLoading={isGenerating}
+                        placeholder={
+                            activeTool === ToolType.WEBSITE_DESIGNER ? "Describe the website you want to build..." :
+                            activeTool === ToolType.POSTER_DESIGNER ? "Describe the poster (include text details)..." :
+                            "Describe what you want to create..."
+                        }
+                        imagePreview={imageBase64}
+                    />
+                 )}
 
-                    {/* Output Section */}
-                    <div className="flex-1 bg-white rounded-2xl shadow-lg border border-slate-100 flex flex-col h-full overflow-hidden">
-                        <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                            <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                                {result ? <span className="w-2 h-2 rounded-full bg-green-500" /> : <span className="w-2 h-2 rounded-full bg-slate-300" />}
-                                {result ? "Result Ready" : "Preview Area"}
+                 {result && (
+                    <div className="bg-white p-8 rounded-3xl shadow-xl border border-sky-100 animate-in fade-in slide-in-from-bottom-6">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="font-bold text-navy text-xl flex items-center gap-2">
+                                <Sparkles className="w-6 h-6 text-sky-500" /> Generated Result
                             </h3>
-                            {result?.html && <span className="text-xs font-mono bg-slate-200 px-2 py-1 rounded text-slate-600">HTML Preview</span>}
+                            {result.html && (
+                                <Button variant="secondary" onClick={() => {
+                                    const win = window.open('', '_blank');
+                                    if (win) { win.document.write(result.html); win.document.close(); }
+                                }} className="text-xs px-4">
+                                    <Maximize2 className="w-4 h-4 mr-2" /> Full Screen
+                                </Button>
+                            )}
                         </div>
 
-                        <div className="flex-1 overflow-hidden relative flex flex-col justify-center items-center bg-slate-50">
-                            {isLoading ? (
-                                <div className="text-center p-8">
-                                    <Loader2 className="w-12 h-12 text-sky-500 animate-spin mx-auto mb-4" />
-                                    <p className="text-slate-600 font-medium animate-pulse">
-                                        {activeTool === ToolType.WEBSITE_DESIGNER ? "Coding website..." : "Creating magic..."}
-                                    </p>
-                                </div>
-                            ) : result ? (
-                                <>
-                                    {/* Image Result */}
-                                    {result.imageUrl && (
-                                        <div className="w-full h-full flex items-center justify-center bg-slate-900 overflow-auto p-4">
-                                            <img src={result.imageUrl} alt="Generated" className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" />
-                                        </div>
-                                    )}
-                                    
-                                    {/* Audio Result (Voice Chat & TTS) */}
-                                    {result.audioUrl && (
-                                        <div className="text-center w-full max-w-md p-10 bg-white rounded-2xl shadow-xl border border-slate-100 m-4">
-                                            <div className="w-24 h-24 bg-sky-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                                                <Mic className="w-10 h-10 text-sky-500" />
-                                            </div>
-                                            <h3 className="text-xl font-bold text-slate-900 mb-2">Audio Response</h3>
-                                            <p className="text-slate-500 mb-6">AI generated voice message</p>
-                                            <audio controls autoPlay className="w-full" src={result.audioUrl} />
-                                        </div>
-                                    )}
-
-                                    {/* HTML/Website Result */}
-                                    {result.html && (
-                                        <div className="w-full h-full bg-white relative">
-                                            <iframe 
-                                                srcDoc={result.html} 
-                                                className="w-full h-full border-0" 
-                                                title="Website Preview" 
-                                                sandbox="allow-scripts"
-                                            />
-                                        </div>
-                                    )}
-
-                                    {/* Fallback Text */}
-                                    {result.text && !result.html && !result.imageUrl && !result.audioUrl && (
-                                        <div className="prose prose-slate max-w-none p-8 w-full h-full overflow-auto">
-                                            <p className="text-lg leading-relaxed">{result.text}</p>
-                                        </div>
-                                    )}
-                                </>
-                            ) : (
-                                <div className="text-center text-slate-400 p-8">
-                                    <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-200">
-                                        {activeTool === ToolType.ANIMATION_3D ? <Video className="w-8 h-8 opacity-40" /> : 
-                                         activeTool === ToolType.VOICE_STUDIO ? <Mic className="w-8 h-8 opacity-40" /> :
-                                         activeTool === ToolType.WEBSITE_DESIGNER ? <Monitor className="w-8 h-8 opacity-40" /> :
-                                         <ImageIcon className="w-8 h-8 opacity-40" />}
+                        <div className="min-h-[300px] flex items-center justify-center bg-gray-50 rounded-2xl overflow-hidden border border-gray-100">
+                            {result.imageUrl ? (
+                                <img src={result.imageUrl} alt="Generated" className="max-w-full rounded-lg shadow-sm" />
+                            ) : result.html ? (
+                                <iframe 
+                                    srcDoc={result.html} 
+                                    className="w-full h-[500px] border-none bg-white" 
+                                    title="Preview"
+                                />
+                            ) : result.audioUrl ? (
+                                <div className="text-center w-full p-10">
+                                    <div className="w-24 h-24 bg-gradient-to-br from-green-400 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-8 shadow-xl shadow-green-200">
+                                        <Music className="w-10 h-10 text-white" />
                                     </div>
-                                    <p className="font-medium">Output will appear here</p>
-                                    <p className="text-sm opacity-70 mt-1">Ready to create</p>
+                                    <audio controls src={result.audioUrl} className="w-full max-w-md mx-auto mb-6" autoPlay />
+                                    {result.text && <p className="text-navy font-medium bg-white p-6 rounded-2xl border border-gray-200 shadow-sm inline-block max-w-xl text-lg">"{result.text}"</p>}
+                                </div>
+                            ) : (
+                                <div className="p-6 text-softblack whitespace-pre-wrap font-mono text-base">
+                                    {result.text}
                                 </div>
                             )}
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
-      </main>
+                 )}
+               </div>
+             </div>
+           )}
 
-      {/* Project Detail Modal Overlay */}
+        </main>
+      </div>
+
       {selectedProject && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-            <div className="w-full max-w-6xl h-[90vh] bg-white rounded-2xl overflow-hidden flex flex-col shadow-2xl relative">
-                
-                {/* Modal Header */}
-                <div className="h-16 border-b border-slate-200 flex items-center justify-between px-6 bg-slate-50">
-                    <div className="flex items-center gap-3">
-                        <div className={`w-2 h-2 rounded-full ${selectedProject.html ? 'bg-blue-500' : 'bg-purple-500'}`} />
-                        <h2 className="font-bold text-lg text-slate-900">{selectedProject.name}</h2>
-                    </div>
-                    <div className="flex items-center gap-2">
-                         <button 
-                            onClick={(e) => handleDownloadProject(e, selectedProject)}
-                            className="flex items-center gap-2 px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-lg text-sm font-medium transition-colors"
-                        >
-                            <Download className="w-4 h-4" /> Download
-                        </button>
-                        <button 
-                            onClick={(e) => handleDeleteProject(e, selectedProject.id)}
-                            className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-lg transition-colors"
-                            title="Delete"
-                        >
-                            <Trash2 className="w-5 h-5" />
-                        </button>
-                        <button 
-                            onClick={() => setSelectedProject(null)}
-                            className="p-2 hover:bg-slate-200 rounded-lg transition-colors ml-2"
-                        >
-                            <X className="w-6 h-6 text-slate-600" />
-                        </button>
-                    </div>
-                </div>
-
-                {/* Modal Content */}
-                <div className="flex-1 bg-slate-100 overflow-hidden relative flex items-center justify-center">
-                    {selectedProject.mediaUrl && (selectedProject.mediaUrl.startsWith('data:image') || selectedProject.mediaUrl.startsWith('http')) ? (
-                         <img src={selectedProject.mediaUrl} className="max-w-full max-h-full object-contain" alt="Full view" />
-                    ) : selectedProject.html ? (
-                         <iframe srcDoc={selectedProject.html} className="w-full h-full bg-white" title="Website Full View" />
-                    ) : selectedProject.mediaUrl && selectedProject.mediaUrl.startsWith('data:audio') ? (
-                         <div className="text-center p-10 bg-white rounded-2xl shadow-xl">
-                            <Mic className="w-16 h-16 text-sky-500 mx-auto mb-4" />
-                            <h3 className="text-xl font-medium mb-4">Audio Playback</h3>
-                            <audio controls src={selectedProject.mediaUrl} className="w-80" />
-                         </div>
-                    ) : (
-                         <div className="p-10 max-w-2xl bg-white rounded-xl shadow-sm overflow-y-auto max-h-full">
-                            <p className="text-lg leading-relaxed whitespace-pre-wrap">{selectedProject.content}</p>
-                         </div>
-                    )}
-                </div>
-            </div>
-        </div>
+          <div className="fixed inset-0 z-50 bg-navy/95 backdrop-blur-md flex items-center justify-center p-4 md:p-8 animate-in fade-in duration-200">
+              <button 
+                onClick={() => setSelectedProject(null)}
+                className="absolute top-6 right-6 bg-white/10 hover:bg-white/20 text-white p-3 rounded-full transition-colors z-50"
+              >
+                  <X className="w-8 h-8" />
+              </button>
+              
+              <div className="bg-white rounded-3xl w-full max-w-6xl max-h-full overflow-hidden shadow-2xl flex flex-col relative">
+                  <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                      <div>
+                          <h3 className="font-bold text-navy text-2xl">{selectedProject.name}</h3>
+                          <span className="text-xs text-gray-400 font-bold uppercase">{selectedProject.type.replace(/_/g, ' ')}</span>
+                      </div>
+                      <Button onClick={() => handleDownload(selectedProject)} className="shadow-sky-200">
+                          Save Image <Download className="w-4 h-4" />
+                      </Button>
+                  </div>
+                  <div className="flex-1 overflow-auto bg-gray-100 flex items-center justify-center min-h-[60vh] p-4">
+                       {selectedProject.mediaUrl && !selectedProject.mediaUrl.startsWith('data:audio') ? (
+                           <img src={selectedProject.mediaUrl} alt="Full view" className="max-w-full max-h-[75vh] object-contain shadow-2xl rounded-lg" />
+                       ) : selectedProject.html ? (
+                           <iframe srcDoc={selectedProject.html} className="w-full h-[75vh] bg-white rounded-lg shadow-sm" />
+                       ) : selectedProject.mediaUrl && selectedProject.mediaUrl.startsWith('data:audio') ? (
+                           <div className="text-center p-12 bg-white rounded-3xl shadow-lg">
+                               <div className="w-32 h-32 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-8 shadow-2xl shadow-green-200">
+                                  <Music className="w-14 h-14 text-white" />
+                               </div>
+                               <audio controls src={selectedProject.mediaUrl} className="w-80" />
+                           </div>
+                       ) : (
+                           <pre className="p-8 whitespace-pre-wrap font-mono text-sm text-gray-700 bg-white m-8 rounded-xl shadow-sm overflow-auto max-h-[60vh] w-full border border-gray-200">
+                               {selectedProject.content}
+                           </pre>
+                       )}
+                  </div>
+              </div>
+          </div>
       )}
 
     </div>
-  );
-}
-
-// Helper icon component for loading state reuse
-function Loader2({ className }: { className?: string }) {
-  return (
-    <svg 
-      className={className} 
-      xmlns="http://www.w3.org/2000/svg" 
-      width="24" 
-      height="24" 
-      viewBox="0 0 24 24" 
-      fill="none" 
-      stroke="currentColor" 
-      strokeWidth="2" 
-      strokeLinecap="round" 
-      strokeLinejoin="round"
-    >
-      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-    </svg>
   );
 }
